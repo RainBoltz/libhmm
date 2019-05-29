@@ -7,44 +7,46 @@
 #include "Libhmm.h"
 
 namespace Libhmm {
-	void init_prob(double* M, int i) {
-		M = new double[i];
+	double* init_prob(int i) {
+		double *M = new double[i];
 		for (int c = 0; c < i; c++)
 			M[c] = 1.0 / i;
+		return M;
 	}
-	void init_prob(double** M, int i, int j) {
-		for (int a = 0; a < i; i++) {
-			M = new double*[i];
-			for (int b = 0; b < j; b++) {
-				M[b] = new double[j];
-				for (int c = 0; c < j; c++)
-					M[b][c] = 1.0 / j;
-			}
+	double** init_prob(int i, int j) {
+		double **M = new double*[i];
+		for (int b = 0; b < i; b++) {
+			M[b] = new double[j];
+			for (int c = 0; c < j; c++)
+				M[b][c] = 1.0 / j;
 		}
+		return M;
 	}
 	void free_memory(double* M) {
 		delete[] M;
+		M = NULL;
 	}
 	void free_memory(double** M) {
-		int _n = _msize(M[0]) / sizeof(M[0][0]);
-		for (int i = _n - 1; i >= 0; i++)
+		int nrow = _msize(M) / sizeof(**M);
+		for (int i = 0; i < nrow; i++) {
 			delete[] M[i];
+		}
+		delete[] M;
+		M = NULL;
 	}
 
 	HMM::HMM(int n, int m): N(n), M(m){
-		init_prob(A, n, n);
-		init_prob(B, n, m);
-		init_prob(pi, n);
-		std::cout << "CREATED!" << std::endl;
+		this->A = init_prob(n, n);
+		this->B = init_prob(n, m);
+		this->pi = init_prob(n);
 	}
 	HMM::HMM(char* model_path){
 		load_model(model_path);
 	}
 	HMM::~HMM() {
-		free_memory(A);
-		free_memory(B);
-		free_memory(pi);
-		std::cout << "DELETED!" << std::endl;
+		free_memory(this->A);
+		free_memory(this->B);
+		free_memory(this->pi);
 	};
 	void HMM::load_model(char* model_path){
 

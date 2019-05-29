@@ -2,8 +2,8 @@
 
 namespace Libhmm
 {
-	void init_prob(double* M, int i);
-	void init_prob(double** M, int i, int j);
+	double* init_prob(int i);
+	double** init_prob(int i, int j);
 	void free_memory(double* M);
 	void free_memory(double** M);
 
@@ -30,9 +30,9 @@ namespace Libhmm
 	public:
 		HMM_Trainer(int n, int m, int t);
 		~HMM_Trainer();
-		double **alpha[T][N], **beta[T][N];        /* evaluation problem */
-		double **delta[T][N]; int **phi[T][N];    /* decoding problem */
-		double **gamma[T][N], ***xi[T][N][N];     /* learning problem */
+		//double **alpha[T][N], **beta[T][N];        /* evaluation problem */
+		//double **delta[T][N]; int **phi[T][N];    /* decoding problem */
+		//double **gamma[T][N], ***xi[T][N][N];     /* learning problem */
 	};
 
 }
