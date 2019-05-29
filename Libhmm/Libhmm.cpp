@@ -19,6 +19,9 @@ namespace Libhmm {
 		free_memory(B);
 		free_memory(pi);
 	};
+
+
+
 	void init_prob(double* M, int i) {
 		M = new double[i];
 		for (int c = 0; c < i; c++)
