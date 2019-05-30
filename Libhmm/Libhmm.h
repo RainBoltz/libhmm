@@ -4,22 +4,25 @@ namespace Libhmm
 {
 	double* init_prob(int i);
 	double** init_prob(int i, int j);
-	int** init_prob(int i, int j)
+	double*** init_prob(int i, int j, int k);
+	int** init_state(int i, int j);
 	void free_memory(double* M);
 	void free_memory(double** M);
 	void free_memory(double*** M);
 
-	public ref class HMM
+	public class HMM
 	{
 	public:
+		HMM();
 		HMM(int n, int m);
 		HMM(char* model_path);
 		~HMM();
+		void init(int n, int m);
 		void load_model(char* model_path);
 		void dump_model(char* output_path);
-		double decode_prob(int* o, double** delta, double** phi); /* Viterbi Algorithm */
-		int* HMM::decode_path(int* o, double** delta, double** phi); /* Viterbi Algorithm */
-		void learn(int* o, double** alpha, double** beta, double **gamma, double ***xi); /* EM Algorithm */
+		double decode_prob(int* o, double** delta, int** phi);	/* Viterbi Algorithm */
+		int* decode_path(int* o, double** delta, int** phi);	/* Viterbi Algorithm */
+		void learn(int* o, double** alpha, double** beta, double **gamma, double ***xi);	/* EM Algorithm */
 
 	private:
 		int N;		/* number of hidden states;  Q={1,2,...,N} */
@@ -38,13 +41,18 @@ namespace Libhmm
 	public:
 		HMM_Trainer(int n, int m, int t);
 		~HMM_Trainer();
-		double **alpha[T][N];	/* evaluation problem: forward (T >= 2)*/
-		double **beta[T][N];	/* evaluation problem: backward (T >= 2)*/
-		double **delta[T][N];	/* decoding problem: pi*B (T >= 2)*/
-		int **phi[T][N];    	/* decoding problem: states */
-		double **gamma[T][N];	/* learning problem variables */
-		double ***xi[T][N][N];	/* learning problem variables */
-		void train(HMM::HMM* hmms, int*** training_set, int nclass, int ndata, int nepoch);
+		double **alpha;	/* evaluation problem: forward (T >= 2)*/
+		double **beta;	/* evaluation problem: backward (T >= 2)*/
+		double **delta;	/* decoding problem: pi*B (T >= 2)*/
+		int **phi;    	/* decoding problem: states */
+		double **gamma;	/* learning problem variables */
+		double ***xi;	/* learning problem variables */
+		void train(int*** training_set, int nepoch);
+		int recognize(int* o);
+	private:
+		bool init;
+		int N, M, MaxT;
+		HMM* hmms;
 	};
 
 }
