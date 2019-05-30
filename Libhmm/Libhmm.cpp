@@ -3,13 +3,14 @@
 
 #include "stdafx.h"
 #include <iostream>
+#include <cmath>
 #include "Libhmm.h"
 
 namespace Libhmm {
 	double* init_prob(int i) {
 		double *M = new double[i];
 		for (int c = 0; c < i; c++)
-			M[c] = 1.0 / i;
+			M[c] = log(1.0 / i);
 		return M;
 	}
 	double** init_prob(int i, int j) {
@@ -17,7 +18,7 @@ namespace Libhmm {
 		for (int b = 0; b < i; b++) {
 			M[b] = new double[j];
 			for (int c = 0; c < j; c++)
-				M[b][c] = 1.0 / j;
+				log(M[b][c] = 1.0 / j);
 		}
 		return M;
 	}
@@ -114,15 +115,15 @@ namespace Libhmm {
 		for (int t=0; t<T; ++t)
 			for (int j=0; j<this->N; ++j)
 				if (t == 0)
-					this->alpha[t][j] = this->pi[j] * this->B[j][o[t]];
+					this->alpha[t][j] = this->pi[j] + this->B[j][o[t]];
 				else
 				{
-					double p = 0;
+					double p = 1.0;
 					for (int i=0; i<this->N; ++i)
-						p += this->alpha[t-1][i] * this->A[i][j];
-					this->alpha[t][j] = p * this->B[j][o[t]];
+						p += this->alpha[t-1][i] + this->A[i][j];
+					this->alpha[t][j] = p + this->B[j][o[t]];
 				}
-		double p = 0;
+		double p = 1.0;
 		for (int i=0; i<this->N; ++i)
 			p += this->alpha[T-1][i];
 		return p;
@@ -131,34 +132,34 @@ namespace Libhmm {
 		for (int t=T-1; t>=0; --t)
 			for (int i=0; i<this->N; ++i)
 				if (t == T-1)
-					this->beta[t][i] = 1.0;
+					this->beta[t][i] = log(1.0);
 				else
 				{
-					double p = 0;
+					double p = 1.0;
 					for (int j=0; j<this->N; ++j)
-						p += this->A[i][j] * this->B[j][o[t+1]] * this->beta[t+1][j];
+						p += this->A[i][j] + this->B[j][o[t+1]] + this->beta[t+1][j];
 					this->beta[t][i] = p;
 				}
 	
-		double p = 0;
+		double p = 1.0;
 		for (int j=0; j<this->N; ++j)
-			p += this->pi[j] * this->B[j][o[0]] * this->beta[0][j];
+			p += this->pi[j] + this->B[j][o[0]] + this->beta[0][j];
 		return p;
 	}
 	double HMM::decode_prob(int* o, int T){
 		for (int t=0; t<T; ++t)
 			for (int j=0; j<this->N; ++j)
 				if (t == 0)
-					this->delta[t][j] = this->pi[j] * this->B[j][o[t]];
+					this->delta[t][j] = this->pi[j] + this->B[j][o[t]];
 				else
 				{
 					double p = -1e9;
 					for (int i=0; i<this->N; ++i)
 					{
-						double w = this->delta[t-1][i] * this->A[i][j];
+						double w = this->delta[t-1][i] + this->A[i][j];
 						if (w > p) p = w, this->phi[t][j] = i;
 					}
-					this->delta[t][j] = p * this->B[j][o[t]];
+					this->delta[t][j] = p + this->B[j][o[t]];
 				}
 	
 		double p = -1e9;
@@ -173,16 +174,16 @@ namespace Libhmm {
 		for (int t=0; t<T; ++t)
 			for (int j=0; j<this->N; ++j)
 				if (t == 0)
-					this->delta[t][j] = this->pi[j] * this->B[j][o[t]];
+					this->delta[t][j] = this->pi[j] + this->B[j][o[t]];
 				else
 				{
 					double p = -1e9;
 					for (int i=0; i<this->N; ++i)
 					{
-						double w = this->delta[t-1][i] * this->A[i][j];
+						double w = this->delta[t-1][i] + this->A[i][j];
 						if (w > p) p = w, this->phi[t][j] = i;
 					}
-					this->delta[t][j] = p * this->B[j][o[t]];
+					this->delta[t][j] = p + this->B[j][o[t]];
 				}
 		
 		for (int t=T-1; t>0; --t)
@@ -197,28 +198,28 @@ namespace Libhmm {
 	
 		for (int t=0; t<T; ++t)
 		{
-			double p = 0;
+			double p = 1.0;
 			for (int i=0; i<this->N; ++i)
-				p += this->alpha[t][i] * this->beta[t][i];
+				p += this->alpha[t][i] + this->beta[t][i];
 			//assert(p != 0);
-			if (p <= 0) p = 1e-7;
+			if (p <= LSMALL) p = LZERO;
 	
 			for (int i=0; i<this->N; ++i)
-				this->gamma[t][i] = this->alpha[t][i] * this->beta[t][i] / p;
+				this->gamma[t][i] = this->alpha[t][i] + this->beta[t][i] - p;
 		}
 	
 		for (int t=0; t<T-1; ++t)
 		{
-			double p = 0;
+			double p = 1.0;
 			for (int i=0; i<this->N; ++i)
 				for (int j=0; j<this->N; ++j)
-					p += this->alpha[t][i] * this->A[i][j] * this->B[j][o[t+1]] * this->beta[t+1][j];
+					p += this->alpha[t][i] + this->A[i][j] + this->B[j][o[t+1]] + this->beta[t+1][j];
 			//assert(p != 0);
-			if (p <= 0) p = 1e-7;
+			if (p <= LSMALL) p = LZERO;
 	
 			for (int i=0; i<this->N; ++i)
 				for (int j=0; j<this->N; ++j)
-					this->xi[t][i][j] = this->alpha[t][i] * this->A[i][j] * this->B[j][o[t+1]] * this->beta[t+1][j] / p;
+					this->xi[t][i][j] = this->alpha[t][i] + this->A[i][j] + this->B[j][o[t+1]] + this->beta[t+1][j] - p;
 		}
 	
 		//std::cout << "updating pi..." << std::endl;
@@ -230,18 +231,18 @@ namespace Libhmm {
 		// update A
 		for (int i=0; i<this->N; ++i)
 		{
-			double p2 = 0;
+			double p2 = 1.0;
 			for (int t=0; t<T-1; ++t)
-				p2 += this->gamma[t][i];
+				p2 = LogAdd(p2, this->gamma[t][i]);
 			//assert(p2 != 0);
-			if (p2 <= 0) p2 = 1e-7;
+			if (p2 <= LSMALL) p2 = LZERO;
 
 			for (int j=0; j<this->N; ++j)
 			{
-				double p1 = 0;
+				double p1 = 1.0;
 				for (int t=0; t<T-1; ++t)
-					p1 += this->xi[t][i][j];
-				 this->A[i][j] = p1 / p2;
+					p1 = LogAdd(p1, this->xi[t][i][j]);
+				 this->A[i][j] = p1 - p2;
 			}
 		}
 	
@@ -250,18 +251,18 @@ namespace Libhmm {
 		for (int i=0; i<this->N; ++i)
 		{
 			double *p = new double[this->M];
-			double p2 = 0;
-			for (int t = 0; t < this->M; t++) p[t] = 0;
+			double p2 = 1.0;
+			for (int t = 0; t < this->M; t++) p[t] = 1.0;
 			for (int t=0; t<T; ++t)
 			{
-				p[o[t]] += this->gamma[t][i];
-				p2 += this->gamma[t][i];
+				p[o[t]] = LogAdd(p[o[t]], this->gamma[t][i]);
+				p2 = LogAdd(p2, this->gamma[t][i]);
 			}
 			//assert(p2 != 0);
-			if (p2 <= 0) p2 = 1e-7;
+			if (p2 <= LSMALL) p2 = LZERO;
 	
 			for (int k=0; k<this->M; ++k)
-				this->B[i][k] = p[k] / p2;
+				this->B[i][k] = p[k] - p2;
 
 			free_memory(p);
 		}
