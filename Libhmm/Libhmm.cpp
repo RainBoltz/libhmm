@@ -75,8 +75,8 @@ namespace Libhmm {
 	}
 
 	HMM::HMM() {};
-	HMM::HMM(int n, int m): N(n), M(m) {
-		this->init(n, m);
+	HMM::HMM(int n, int m, int t): N(n), M(m), maxT(t) {
+		this->init(n, m, t);
 	}
 	HMM::HMM(char* model_path){
 		load_model(model_path);
@@ -85,6 +85,12 @@ namespace Libhmm {
 		free_memory(this->A);
 		free_memory(this->B);
 		free_memory(this->pi);
+		free_memory(this->alpha);
+		free_memory(this->beta);
+		free_memory(this->delta);
+		free_memory(this->phi);
+		free_memory(this->gamma);
+		free_memory(this->xi);
 	}
 	void HMM::load_model(char* model_path){
 		//TODO
@@ -92,111 +98,113 @@ namespace Libhmm {
 	void HMM::dump_model(char* output_path){
 		//TODO
 	}
-	void HMM::init(int n, int m){
+	void HMM::init(int n, int m, int t){
 		this->A = init_prob(n, n);
 		this->B = init_prob(n, m);
 		this->pi = init_prob(n);
+		this->alpha = init_prob(t, n);
+		this->beta = init_prob(t, n);
+		this->delta = init_prob(t, n);
+		this->phi = init_state(t, n);
+		this->gamma = init_prob(t, n);
+		this->xi = init_prob(t, n, n);
 	}
 
-	double HMM::forward(int* o, int T, double** alpha){
-		//int T = _msize(o) / sizeof(*o);
+	double HMM::forward(int* o, int T){
 		for (int t=0; t<T; ++t)
 			for (int j=0; j<this->N; ++j)
 				if (t == 0)
-					alpha[t][j] = this->pi[j] * this->B[j][o[t]];
+					this->alpha[t][j] = this->pi[j] * this->B[j][o[t]];
 				else
 				{
 					double p = 0;
 					for (int i=0; i<this->N; ++i)
-						p += alpha[t-1][i] * this->A[i][j];
-					alpha[t][j] = p * this->B[j][o[t]];
+						p += this->alpha[t-1][i] * this->A[i][j];
+					this->alpha[t][j] = p * this->B[j][o[t]];
 				}
 		double p = 0;
 		for (int i=0; i<this->N; ++i)
-			p += alpha[T-1][i];
+			p += this->alpha[T-1][i];
 		return p;
 	}
-	double HMM::backward(int* o, int T, double** beta){
-		//int T = _msize(o) / sizeof(*o);
+	double HMM::backward(int* o, int T){
 		for (int t=T-1; t>=0; --t)
 			for (int i=0; i<this->N; ++i)
 				if (t == T-1)
-					beta[t][i] = 1.0;
+					this->beta[t][i] = 1.0;
 				else
 				{
 					double p = 0;
 					for (int j=0; j<this->N; ++j)
-						p += this->A[i][j] * this->B[j][o[t+1]] * beta[t+1][j];
-					beta[t][i] = p;
+						p += this->A[i][j] * this->B[j][o[t+1]] * this->beta[t+1][j];
+					this->beta[t][i] = p;
 				}
 	
 		double p = 0;
 		for (int j=0; j<this->N; ++j)
-			p += this->pi[j] * this->B[j][o[0]] * beta[0][j];
+			p += this->pi[j] * this->B[j][o[0]] * this->beta[0][j];
 		return p;
 	}
-	double HMM::decode_prob(int* o, double** delta, int** phi){
-		int T = _msize(o) / sizeof(*o);
+	double HMM::decode_prob(int* o, int T){
 		for (int t=0; t<T; ++t)
 			for (int j=0; j<this->N; ++j)
 				if (t == 0)
-					delta[t][j] = this->pi[j] * this->B[j][o[t]];
+					this->delta[t][j] = this->pi[j] * this->B[j][o[t]];
 				else
 				{
 					double p = -1e9;
 					for (int i=0; i<this->N; ++i)
 					{
-						double w = delta[t-1][i] * this->A[i][j];
-						if (w > p) p = w, phi[t][j] = i;
+						double w = this->delta[t-1][i] * this->A[i][j];
+						if (w > p) p = w, this->phi[t][j] = i;
 					}
-					delta[t][j] = p * this->B[j][o[t]];
+					this->delta[t][j] = p * this->B[j][o[t]];
 				}
 	
 		double p = -1e9;
 		for (int j=0; j<this->N; ++j)
-			if (delta[T-1][j] > p)
-				p = delta[T-1][j];
+			if (this->delta[T-1][j] > p)
+				p = this->delta[T-1][j];
 		
 		return p;
 	}
-	int* HMM::decode_path(int* o, double** delta, int** phi){
-		//q: best sequence of hidden states for observation o
-		int T = _msize(o) / sizeof(*o);
+	int* HMM::decode_path(int* o, int T){
 		int *q = new int[T];
 		for (int t=0; t<T; ++t)
 			for (int j=0; j<this->N; ++j)
 				if (t == 0)
-					delta[t][j] = this->pi[j] * this->B[j][o[t]];
+					this->delta[t][j] = this->pi[j] * this->B[j][o[t]];
 				else
 				{
 					double p = -1e9;
 					for (int i=0; i<this->N; ++i)
 					{
-						double w = delta[t-1][i] * this->A[i][j];
-						if (w > p) p = w, phi[t][j] = i;
+						double w = this->delta[t-1][i] * this->A[i][j];
+						if (w > p) p = w, this->phi[t][j] = i;
 					}
-					delta[t][j] = p * this->B[j][o[t]];
+					this->delta[t][j] = p * this->B[j][o[t]];
 				}
 		
 		for (int t=T-1; t>0; --t)
-			q[t-1] = phi[t][q[t]];
+			q[t-1] = this->phi[t][q[t]];
 		
 		return q;
 	}
-	void HMM::learn(int* o, double** alpha, double** beta, double **gamma, double ***xi){
-		int T = _msize(o) / sizeof(*o);
-		this->forward(o, T, alpha);
-		this->backward(o, T, beta);
+	void HMM::learn(int* o, int T){
+		//std::cout << "START LEARNING!" << std::endl;
+		this->forward(o, T);
+		this->backward(o, T);
 	
 		for (int t=0; t<T; ++t)
 		{
 			double p = 0;
 			for (int i=0; i<this->N; ++i)
-				p += alpha[t][i] * beta[t][i];
+				p += this->alpha[t][i] * this->beta[t][i];
 			//assert(p != 0);
+			if (p <= 0) p = 1e-7;
 	
 			for (int i=0; i<this->N; ++i)
-				gamma[t][i] = alpha[t][i] * beta[t][i] / p;
+				this->gamma[t][i] = this->alpha[t][i] * this->beta[t][i] / p;
 		}
 	
 		for (int t=0; t<T-1; ++t)
@@ -204,35 +212,40 @@ namespace Libhmm {
 			double p = 0;
 			for (int i=0; i<this->N; ++i)
 				for (int j=0; j<this->N; ++j)
-					p += alpha[t][i] * this->A[i][j] * this->B[j][o[t+1]] * beta[t+1][j];
+					p += this->alpha[t][i] * this->A[i][j] * this->B[j][o[t+1]] * this->beta[t+1][j];
 			//assert(p != 0);
+			if (p <= 0) p = 1e-7;
 	
 			for (int i=0; i<this->N; ++i)
 				for (int j=0; j<this->N; ++j)
-					xi[t][i][j] = alpha[t][i] * this->A[i][j] * this->B[j][o[t+1]] * beta[t+1][j] / p;
+					this->xi[t][i][j] = this->alpha[t][i] * this->A[i][j] * this->B[j][o[t+1]] * this->beta[t+1][j] / p;
 		}
 	
+		//std::cout << "updating pi..." << std::endl;
 		// update pi
 		for (int i=0; i<this->N; ++i)
-			 this->pi[i] = gamma[0][i];
+			 this->pi[i] = this->gamma[0][i];
 
+		//std::cout << "updating A..." << std::endl;
 		// update A
 		for (int i=0; i<this->N; ++i)
 		{
 			double p2 = 0;
 			for (int t=0; t<T-1; ++t)
-				p2 += gamma[t][i];
+				p2 += this->gamma[t][i];
 			//assert(p2 != 0);
+			if (p2 <= 0) p2 = 1e-7;
 
 			for (int j=0; j<this->N; ++j)
 			{
 				double p1 = 0;
 				for (int t=0; t<T-1; ++t)
-					p1 += xi[t][i][j];
+					p1 += this->xi[t][i][j];
 				 this->A[i][j] = p1 / p2;
 			}
 		}
 	
+		//std::cout << "updating B..." << std::endl;
 		// update B
 		for (int i=0; i<this->N; ++i)
 		{
@@ -241,68 +254,17 @@ namespace Libhmm {
 			for (int t = 0; t < this->M; t++) p[t] = 0;
 			for (int t=0; t<T; ++t)
 			{
-				p[o[t]] += gamma[t][i];
-				p2 += gamma[t][i];
+				p[o[t]] += this->gamma[t][i];
+				p2 += this->gamma[t][i];
 			}
 			//assert(p2 != 0);
+			if (p2 <= 0) p2 = 1e-7;
 	
 			for (int k=0; k<this->M; ++k)
 				this->B[i][k] = p[k] / p2;
 
 			free_memory(p);
 		}
-	}
-
-	HMM_Trainer::HMM_Trainer(int n, int m, int t): N(n), M(m), MaxT(t){
-		// t is the max limit of observation length
-		this->alpha = init_prob(t, n);
-		this->beta = init_prob(t, n);
-		this->delta = init_prob(t, n);
-		this->phi = init_state(t, n);
-		this->gamma = init_prob(t, n);
-		this->xi = init_prob(t, n, n);
-		this->init = true;
-	}
-	HMM_Trainer::~HMM_Trainer(){
-		free_memory(this->alpha);
-		free_memory(this->beta);
-		free_memory(this->delta);
-		free_memory(this->phi);
-		free_memory(this->gamma);
-		free_memory(this->xi);
-	}
-	void HMM_Trainer::train(int*** training_set, int nepoch){
-		int nclass = _msize(training_set) / sizeof(***training_set);
-		
-		if (init) {
-			HMM* new_hmms = new HMM[nclass];
-			for (int c = 0; c < nclass; c++) new_hmms[c].init(this->N, this->M);
-			this->hmms = new_hmms;
-			init = false;
-		}
-		
-		for (int i=0; i<nclass; ++i)
-			for (int l = 0; l < nepoch; ++l) {
-				int ndata = _msize(training_set[i]) / sizeof(***training_set);
-				for (int j = 0; j < ndata; ++j) {
-					if (l == 0) std::cout << "START TRAINING" << std::endl;
-					else if (l % 10 == 0) std::cout << "TRAINED " << l + 1 << "EPOCHS..." << std::endl;
-					hmms[i].learn(training_set[i][j], this->alpha, this->beta, this->gamma, this->xi);
-				}
-			}
-		std::cout << "TRAINING FINISHED!" << std::endl;
-	}
-	int HMM_Trainer::recognize(int* o){
-		int T = _msize(o) / sizeof(*o);
-		int nclass = _msize(hmms) / sizeof(*hmms);
-		int ans = -1;
-		double p = -1e9;
-		for (int i=0; i<nclass; ++i)
-		{
-			double pp = hmms[i].decode_prob(o, this->delta, this->phi);
-			if (pp > p) p = pp, ans = i;
-		}
-		return ans;
 	}
 
 }
