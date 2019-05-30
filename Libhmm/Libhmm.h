@@ -23,6 +23,8 @@ namespace Libhmm
 		double decode_prob(int* o, int T);	/* Viterbi Algorithm: can be used to recognize classes*/
 		int* decode_path(int* o, int T);	/* Viterbi Algorithm */
 		void learn(int* o, int T);	/* EM Algorithm */
+		void show_A();
+		void show_B();
 
 	private:
 		int N;		/* number of hidden states;  Q={1,2,...,N} */

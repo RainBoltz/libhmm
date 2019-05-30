@@ -3,6 +3,7 @@
 
 #include "stdafx.h"
 #include <iostream>
+#include "stdio.h"
 #include "Libhmm.h"
 
 namespace Libhmm {
@@ -266,5 +267,22 @@ namespace Libhmm {
 			free_memory(p);
 		}
 	}
-
+	void HMM::show_A() {
+		for (int x = 0; x < this->N; x++){
+			for (int y = 0; y < this->N; y++){
+				printf("%.09f ",this->A[x][y]);
+			}
+			printf("\n");
+		}
+		printf("\n");
+	}
+	void HMM::show_B() {
+		for (int x = 0; x < this->N; x++) {
+			for (int y = 0; y < this->M; y++) {
+				printf("%.09f ", this->B[x][y]);
+			}
+			printf("\n");
+		}
+		printf("\n");
+	}
 }
